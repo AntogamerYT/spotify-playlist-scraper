@@ -11,9 +11,11 @@
   "author": "antogamer",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^18.15.11",
-    "dotenv": "^16.0.3",
-    "spotify-playlist": "^0.0.4",
-    "typescript": "^5.0.4"
+    "chalk": "^5.2.0",
+    "typescript": "^5.0.4",
+    "yesno": "^0.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.15.11"
   }
 }
