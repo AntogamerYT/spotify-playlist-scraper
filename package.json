@@ -1,0 +1,19 @@
+{
+  "name": "spotify-playlist-scraper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "antogamer",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^18.15.11",
+    "dotenv": "^16.0.3",
+    "spotify-playlist": "^0.0.4",
+    "typescript": "^5.0.4"
+  }
+}
