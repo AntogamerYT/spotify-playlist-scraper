@@ -162,6 +162,10 @@ function logInfo(text: string) {
     console.log(chalk.yellow("[i] " + text))
 }
 
+function logSuccess(text: string) {
+    console.log(chalk.green("[!] " + text))
+}
+
 function logDebug(text: string) {
     console.log(chalk.blueBright("[d] " + text))
 }
@@ -182,11 +186,18 @@ function downloadMusic() {
 
     for (let track of tracksJson) {
         logInfo("Downloading " + track.name);
-        const execution = execSync(`${getPathFromOs()}${ytdlfilenames[osName]} -x --audio-format mp3 --audio-quality 0 --output "tracks/${(track as Track).fileName}" "ytsearch:${track.artist} ${track.name}"`);
+        try {
+            const execution = execSync(`${getPathFromOs()}${ytdlfilenames[osName]} -x --audio-format mp3 --audio-quality 0 --output "tracks/${(track as Track).fileName}" "ytsearch:${track.artist} ${track.name}"`);
+        
+            if (LogType === "DEBUG") logDebug("Ytdl stdout: " + execution.toString())
+        } catch (error: any) {
+            if (error.stderr.includes("Sign in to confirm your age")) logInfo("Skipping " + track.name + " because it's age restricted.")
+            else logInfo("Skipping " + track.name + " because its download errored, enable debug logging for more info.")
+            if(LogType === "DEBUG") logDebug("Ytdl stderr: " + error.stderr.toString())
+            continue;
+        }
 
-        if (LogType === "DEBUG") logDebug("Ytdl stdout: " + execution.toString())
-
-        logInfo("Downloaded " + track.name)
+        logSuccess("Downloaded " + track.name)
     }
 }
 
@@ -204,14 +215,33 @@ async function downloadYtDlp() {
         if (LogType === "DEBUG") logDebug("SHA256 of the yt-dlp file: " + hash)
 
         if (hashesList.includes(hash)) {
-            logInfo("Downloaded yt-dlp")
+            logSuccess("Downloaded yt-dlp")
         } else {
             logInfo("Failed to download yt-dlp, please download it manually from https://github.com/yt-dlp/yt-dlp/releases and put it in the same folder of where you're executing the command, then run the script again.")
             if(LogType === "DEBUG") logDebug("SHA256 Check failed, quitting..")
             process.exit(1);
         }
     } else {
-        logInfo("yt-dlp already exists! Skipping download..")
+        let hash = createHash("sha256").update(fs.readFileSync(resolve(".") + "/" + ytdlfilenames[osName])).digest("hex")
+        const hashesList = await (await fetch("https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS")).text()
+
+        if (LogType === "DEBUG") logDebug("yt-dlp hashes from GitHub: " + hashesList)
+        if (LogType === "DEBUG") logDebug("SHA256 of the yt-dlp file: " + hash)
+
+        if (hashesList.includes(hash)) {
+            logSuccess("yt-dlp already exists! Skipping download..")
+        } else {
+            logInfo("Updating yt-dlp..")
+            if (LogType === "DEBUG") logDebug("SHA256 Check failed (file hash: " + hash + "), updating yt-dlp.)")
+            const Download = await fetch(ytdlLinks[osName])
+            const file = fs.createWriteStream(resolve(".") + "/" + ytdlfilenames[osName], { flags: "wx" })
+            await finished(Readable.fromWeb(Download.body as any).pipe(file))
+            if (osName === "Linux" || osName === "Darwin") spawnSync(`chmod +x ${getPathFromOs()}${ytdlfilenames[osName]}`)
+            hash = createHash("sha256").update(fs.readFileSync(resolve(".") + "/" + ytdlfilenames[osName])).digest("hex")
+            if (hashesList.includes(hash)) {
+                logSuccess("Updated yt-dlp!")
+            }
+        }
     }
 }
 
@@ -255,7 +285,7 @@ async function scrapeMusic() {
     }
 
     fs.writeFileSync(resolve(".") + "/tracks.json", JSON.stringify({ tracks: tracksJson }));
-    logInfo(`Scraped ${playlist.items.length} tracks!`)
+    logSuccess(`Scraped ${playlist.items.length} tracks!`)
 }
 
 

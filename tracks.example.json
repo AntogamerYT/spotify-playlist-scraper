@@ -1,0 +1,17 @@
+{
+    "tracks": [
+        // tracks.json example file
+        {
+            "fileName": "ForestFunkCh1LightWorld.mp3",
+            "name": "Forest Funk (Ch 1 Light World)",
+            "url": "https://open.spotify.com/track/1nGi3nUssOmU2w6gjtGGwb",
+            "artist": "Danny Baranowsky"
+        },
+        {
+            "fileName": "CHADsLullabyCh2Boss.mp3",
+            "name": "C.H.A.D.'s Lullaby (Ch 2 Boss)",
+            "url": "https://open.spotify.com/track/5hLsnXbEpw1KxP6njGi0Y6",
+            "artist": "Danny Baranowsky"
+        }
+    ]
+}
