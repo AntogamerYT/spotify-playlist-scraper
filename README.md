@@ -25,5 +25,5 @@ No need to manually install, you can run the `npx spotify-playlist-scraper` comm
 | cid      | The Spotify API client ID | true                               |
 | secret   | Spotify API client secret | true                               |
 | playlist | The playlist ID, you can obtain it from a link (For example, in https://open.spotify.com/playlist/1YIe34rcmLjCYpY9wJoM2p, **1YIe34rcmLjCYpY9wJoM2p** is the ID) | true                                |
-| log      | Can be DEBUG or info, default for info| false                  |
+| log      | Can be DEBUG or info, default is info| false                  |
 ----------------
