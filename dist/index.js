@@ -9,6 +9,7 @@ import { createInterface } from "readline";
 import { resolve } from "path";
 import fs from 'fs';
 import os from 'os';
+import { createHash } from "crypto";
 /**
  * Console colors and their meanings:
  * Yellow: infos
@@ -32,7 +33,7 @@ argv.slice(2).map(arg => {
     cliArgs[key] = value;
 });
 if (Object.keys(cliArgs).length === 0) {
-    LogInfo("Usage: npx spotify-playlist-scraper cid=Client_ID secret=Client_Secret playlist=Playlist_ID");
+    logInfo("Usage: npx spotify-playlist-scraper cid=Client_ID secret=Client_Secret playlist=Playlist_ID");
     process.exit();
 }
 if (cliArgs["cid"] === undefined || cliArgs["secret"] === undefined) {
@@ -48,7 +49,7 @@ if (cliArgs["playlist"] === undefined) {
         readline.close();
     });
 }
-let tracksJson /*Track[] | TrackNoUrl[]*/ = [];
+let tracksJson = [];
 const SpotifyCID = cliArgs["cid"];
 const SpotifySecret = cliArgs["secret"];
 const SpotifyPlaylistID = cliArgs["playlist"];
@@ -61,10 +62,10 @@ else {
         question: chalk.yellow("A tracks folder already exists! Do you want to keep it or DELETE its content? (y = keep/n = delete)"),
     });
     if (res) {
-        LogInfo("Keeping tracks folder..");
+        logInfo("Keeping tracks folder..");
     }
     else {
-        LogInfo("Deleting tracks folder..");
+        logInfo("Deleting tracks folder..");
         fs.rmSync(resolve(".") + "/tracks", { recursive: true, force: true });
         fs.mkdirSync(resolve(".") + "/tracks");
     }
@@ -75,38 +76,38 @@ if (fs.existsSync(resolve(".") + "/tracks.json")) {
     });
     if (res) {
         tracksJson = JSON.parse(fs.readFileSync(resolve(".") + "/tracks.json", "utf-8")).tracks;
-        await DownloadYtDlp();
-        DownloadMusic();
+        await downloadYtDlp();
+        downloadMusic();
         process.exit();
     }
     else {
-        LogInfo("Overwriting tracks.json..");
-        await ScrapeMusic();
+        logInfo("Overwriting tracks.json..");
+        await scrapeMusic();
         const downloadTracksAnswer = await yesno({
             question: chalk.yellow(`Do you want to download all (${tracksJson.length}) tracks using yt-dlp? ${chalk.red("RESULTS MAY BE INACCURATE, BLAME YOUTUBE, NOT ME!")} (y/n)`),
         });
         if (!downloadTracksAnswer) {
-            LogInfo("Exiting..");
+            logInfo("Exiting..");
             process.exit(0);
         }
         else {
-            await DownloadYtDlp();
-            DownloadMusic();
+            await downloadYtDlp();
+            downloadMusic();
             process.exit();
         }
     }
 }
-await ScrapeMusic();
+await scrapeMusic();
 const downloadTracksAnswer = await yesno({
     question: chalk.yellow(`Do you want to download all (${tracksJson.length}) tracks using yt-dlp? ${chalk.red("RESULTS MAY BE INACCURATE, BLAME YOUTUBE, NOT ME!")}\nThis will also generate filenames in your JSON if you don't already have them! (y/n)`),
 });
 if (!downloadTracksAnswer) {
-    LogInfo("Exiting..");
+    logInfo("Exiting..");
     process.exit(0);
 }
 else {
-    await DownloadYtDlp();
-    await DownloadMusic();
+    await downloadYtDlp();
+    downloadMusic();
     process.exit();
 }
 function parseTrack(track, includeFileName) {
@@ -122,54 +123,59 @@ function replaceAllBadCharacters(str) {
         .replace(/[/\\?%*:|"'().<>-]/g, '')
         .replaceAll(" ", "");
 }
-function LogInfo(text) {
+function logInfo(text) {
     console.log(chalk.yellow("[i] " + text));
 }
-function LogDebug(text) {
-    console.log(chalk.blue("[d] " + text));
+function logDebug(text) {
+    console.log(chalk.blueBright("[d] " + text));
 }
 function getPathFromOs() {
     return osName === "Windows_NT" ? resolve(".") + "\\" : resolve(".") + "/";
 }
-function DownloadMusic() {
-    LogInfo("Downloading tracks..");
-    if (!tracksJson[0].fileName) {
-        LogInfo("No fileName property found, generating filenames..");
+function downloadMusic() {
+    logInfo("Downloading tracks..");
+    if (!('fileName' in tracksJson[0])) {
+        logInfo("No fileName property found, generating filenames..");
         tracksJson = tracksJson.map((track) => parseTrack(track, true));
     }
     for (let track of tracksJson) {
-        LogInfo("Downloading " + track.name);
+        logInfo("Downloading " + track.name);
         const execution = execSync(`${getPathFromOs()}${ytdlfilenames[osName]} -x --audio-format mp3 --audio-quality 0 --output "tracks/${track.fileName}" "ytsearch:${track.artist} ${track.name}"`);
         if (LogType === "DEBUG")
-            LogDebug("Ytdl stdout: " + execution.toString());
-        LogInfo("Downloaded " + track.name);
+            logDebug("Ytdl stdout: " + execution.toString());
+        logInfo("Downloaded " + track.name);
     }
 }
-async function DownloadYtDlp() {
+async function downloadYtDlp() {
     if (!fs.existsSync(resolve(".") + "/" + ytdlfilenames[osName])) {
-        LogInfo("Downloading yt-dlp..");
+        logInfo("Downloading yt-dlp..");
         const Download = await fetch(ytdlLinks[osName]);
         const file = fs.createWriteStream(resolve(".") + "/" + ytdlfilenames[osName], { flags: "wx" });
         await finished(Readable.fromWeb(Download.body).pipe(file));
         if (osName === "Linux" || osName === "Darwin")
             spawnSync(`chmod +x ${getPathFromOs()}${ytdlfilenames[osName]}`);
-        const execution = spawnSync(`${getPathFromOs()}${ytdlfilenames[osName]}`);
+        const hash = createHash("sha256").update(fs.readFileSync(resolve(".") + "/" + ytdlfilenames[osName])).digest("hex");
+        const hashesList = await (await fetch("https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS")).text();
         if (LogType === "DEBUG")
-            LogDebug("Ytdl stdout: " + execution.output.toString());
-        if (execution.output.toString().includes("yt-dlp")) {
-            LogInfo("Downloaded yt-dlp");
+            logDebug("yt-dlp hashes from GitHub: " + hashesList);
+        if (LogType === "DEBUG")
+            logDebug("SHA256 of the yt-dlp file: " + hash);
+        if (hashesList.includes(hash)) {
+            logInfo("Downloaded yt-dlp");
         }
         else {
-            LogInfo("Failed to download yt-dlp, please download it manually from https://github.com/yt-dlp/yt-dlp/releases and put it in the same folder of where you're executing the command, then run the script again.");
+            logInfo("Failed to download yt-dlp, please download it manually from https://github.com/yt-dlp/yt-dlp/releases and put it in the same folder of where you're executing the command, then run the script again.");
+            if (LogType === "DEBUG")
+                logDebug("SHA256 Check failed, quitting..");
             process.exit(1);
         }
     }
     else {
-        LogInfo("yt-dlp already exists! Skipping download..");
+        logInfo("yt-dlp already exists! Skipping download..");
     }
 }
-async function ScrapeMusic() {
-    LogInfo("Scraping tracks..");
+async function scrapeMusic() {
+    logInfo("Scraping tracks..");
     const tokenReq = await fetch("https://accounts.spotify.com/api/token", {
         method: "POST",
         headers: {
@@ -183,7 +189,8 @@ async function ScrapeMusic() {
         throw new Error(chalk.red("The client or secret provided are invalid, please check them and try again."));
     }
     const token = (await tokenReq.json()).access_token;
-    LogDebug("Spotify access token: " + token);
+    if (LogType === "DEBUG")
+        logDebug("Spotify access token: " + token);
     const playlistReq = await fetch(`https://api.spotify.com/v1/playlists/${SpotifyPlaylistID}/tracks`, {
         headers: {
             Authorization: "Bearer " + token,
@@ -201,5 +208,5 @@ async function ScrapeMusic() {
         tracksJson.push(parseTrack(track.track, includeTracks));
     }
     fs.writeFileSync(resolve(".") + "/tracks.json", JSON.stringify({ tracks: tracksJson }));
-    LogInfo(`Scraped ${playlist.items.length} tracks!`);
+    logInfo(`Scraped ${playlist.items.length} tracks!`);
 }
