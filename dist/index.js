@@ -5,6 +5,7 @@ import yesno from "yesno";
 import { argv } from "process";
 import { Readable } from "stream";
 import { finished } from "stream/promises";
+import { createInterface } from "readline";
 import { resolve } from "path";
 import fs from 'fs';
 import os from 'os';
@@ -37,10 +38,17 @@ if (Object.keys(cliArgs).length === 0) {
 if (cliArgs["cid"] === undefined || cliArgs["secret"] === undefined) {
     throw new Error(chalk.red("The Spotify client ID and secret are required to run this script. Get them from https://developer.spotify.com/dashboard/applications and run the script again like this:\nnpx spotify-playlist-scraper cid=Client_ID secret=Client_Secret playlist=Playlist_ID"));
 }
-else if (cliArgs["playlist"] === undefined) {
-    throw new Error(chalk.red(`A playlist ID is required to run this script. Get it from the playlist URL (Example: https://open.spotify.com/playlist/${chalk.yellow("1YIe34rcmLjCYpY9wJoM2p")}) and run the script again like this:\nnpx spotify-playlist-scraper cid=Client_ID secret=Client_Secret playlist=Playlist_ID`));
+if (cliArgs["playlist"] === undefined) {
+    const readline = createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+    readline.question(chalk.yellow(`Please enter a playlist ID, you can get it from a playlist url (Example: https://open.spotify.com/playlist/${chalk.green("1YIe34rcmLjCYpY9wJoM2p")}): `), (playlistID) => {
+        cliArgs["playlist"] = playlistID;
+        readline.close();
+    });
 }
-let tracksJson = [];
+let tracksJson /*Track[] | TrackNoUrl[]*/ = [];
 const SpotifyCID = cliArgs["cid"];
 const SpotifySecret = cliArgs["secret"];
 const SpotifyPlaylistID = cliArgs["playlist"];
@@ -63,7 +71,7 @@ else {
 }
 if (fs.existsSync(resolve(".") + "/tracks.json")) {
     const res = await yesno({
-        question: chalk.yellow("A tracks.json file already exists! Do you want to skip to the music download or overwrite it and scrape it again? (y = skip/n = overwrite)"),
+        question: chalk.yellow("A tracks.json file already exists! Do you want to skip to the music download or overwrite it and scrape it again?\nThis will also generate filenames in your JSON if you don't already have them and decide to skip! (y = skip/n = overwrite)"),
     });
     if (res) {
         tracksJson = JSON.parse(fs.readFileSync(resolve(".") + "/tracks.json", "utf-8")).tracks;
@@ -90,7 +98,7 @@ if (fs.existsSync(resolve(".") + "/tracks.json")) {
 }
 await ScrapeMusic();
 const downloadTracksAnswer = await yesno({
-    question: chalk.yellow(`Do you want to download all (${tracksJson.length}) tracks using yt-dlp? ${chalk.red("RESULTS MAY BE INACCURATE, BLAME YOUTUBE, NOT ME!")} (y/n)`),
+    question: chalk.yellow(`Do you want to download all (${tracksJson.length}) tracks using yt-dlp? ${chalk.red("RESULTS MAY BE INACCURATE, BLAME YOUTUBE, NOT ME!")}\nThis will also generate filenames in your JSON if you don't already have them! (y/n)`),
 });
 if (!downloadTracksAnswer) {
     LogInfo("Exiting..");
@@ -101,12 +109,17 @@ else {
     await DownloadMusic();
     process.exit();
 }
-function parseTrack(track) {
-    return { fileName: replaceAllBadCharacters(track.name) + ".mp3", name: track.name, url: track.external_urls.spotify, artist: track.artists[0].name };
+function parseTrack(track, includeFileName) {
+    if (includeFileName) {
+        return { fileName: replaceAllBadCharacters(track.name) + ".mp3", name: track.name, url: track.external_urls.spotify, artist: track.artists[0].name };
+    }
+    else {
+        return { name: track.name, url: track.external_urls.spotify, artist: track.artists[0].name };
+    }
 }
 function replaceAllBadCharacters(str) {
     return str
-        .replace(/[/\\?%*:|".<>-]/g, '')
+        .replace(/[/\\?%*:|"'().<>-]/g, '')
         .replaceAll(" ", "");
 }
 function LogInfo(text) {
@@ -120,6 +133,10 @@ function getPathFromOs() {
 }
 function DownloadMusic() {
     LogInfo("Downloading tracks..");
+    if (!tracksJson[0].fileName) {
+        LogInfo("No fileName property found, generating filenames..");
+        tracksJson = tracksJson.map((track) => parseTrack(track, true));
+    }
     for (let track of tracksJson) {
         LogInfo("Downloading " + track.name);
         const execution = execSync(`${getPathFromOs()}${ytdlfilenames[osName]} -x --audio-format mp3 --audio-quality 0 --output "tracks/${track.fileName}" "ytsearch:${track.artist} ${track.name}"`);
@@ -134,6 +151,8 @@ async function DownloadYtDlp() {
         const Download = await fetch(ytdlLinks[osName]);
         const file = fs.createWriteStream(resolve(".") + "/" + ytdlfilenames[osName], { flags: "wx" });
         await finished(Readable.fromWeb(Download.body).pipe(file));
+        if (osName === "Linux" || osName === "Darwin")
+            spawnSync(`chmod +x ${getPathFromOs()}${ytdlfilenames[osName]}`);
         const execution = spawnSync(`${getPathFromOs()}${ytdlfilenames[osName]}`);
         if (LogType === "DEBUG")
             LogDebug("Ytdl stdout: " + execution.output.toString());
@@ -149,8 +168,6 @@ async function DownloadYtDlp() {
         LogInfo("yt-dlp already exists! Skipping download..");
     }
 }
-process.on("exit", () => {
-});
 async function ScrapeMusic() {
     LogInfo("Scraping tracks..");
     const tokenReq = await fetch("https://accounts.spotify.com/api/token", {
@@ -166,15 +183,22 @@ async function ScrapeMusic() {
         throw new Error(chalk.red("The client or secret provided are invalid, please check them and try again."));
     }
     const token = (await tokenReq.json()).access_token;
+    LogDebug("Spotify access token: " + token);
     const playlistReq = await fetch(`https://api.spotify.com/v1/playlists/${SpotifyPlaylistID}/tracks`, {
         headers: {
             Authorization: "Bearer " + token,
             "User-agent": "Node.JS Fetch"
         }
     });
+    if (playlistReq.status === 404) {
+        throw new Error(chalk.red("The playlist ID provided is invalid."));
+    }
+    const includeTracks = await yesno({
+        question: chalk.yellow("Do you want to include the track fileName in the tracks.json file? (y/n)")
+    });
     const playlist = await playlistReq.json();
     for (let track of playlist.items) {
-        tracksJson.push(parseTrack(track.track));
+        tracksJson.push(parseTrack(track.track, includeTracks));
     }
     fs.writeFileSync(resolve(".") + "/tracks.json", JSON.stringify({ tracks: tracksJson }));
     LogInfo(`Scraped ${playlist.items.length} tracks!`);
