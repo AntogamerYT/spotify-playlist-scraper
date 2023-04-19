@@ -1,6 +1,6 @@
 {
   "name": "spotify-playlist-scraper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple CLI tool to scrape Spotify playlists, export the songs' informations to a JSON file and download them from YouTube using yt-dlp.",
   "bin": "./dist/index.js",
   "type": "module",
@@ -10,7 +10,7 @@
   },
   "keywords": [],
   "author": "antogamer",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "chalk": "^5.2.0",
     "yesno": "^0.4.0"
@@ -18,5 +18,8 @@
   "devDependencies": {
     "@types/node": "^18.15.11",
     "typescript": "^5.0.4"
+  },
+  "engines": {
+    "node": ">=18.16.0"
   }
 }
