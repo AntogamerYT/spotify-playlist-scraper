@@ -1,3 +1,4 @@
+#! /usr/bin/env node
 import { execSync, spawnSync } from "child_process";
 import chalk from "chalk";
 import yesno from "yesno";
@@ -31,7 +32,7 @@ argv.slice(2).map(arg => {
 });
 if (Object.keys(cliArgs).length === 0) {
     LogInfo("Usage: npx spotify-playlist-scraper cid=Client_ID secret=Client_Secret playlist=Playlist_ID");
-    process.exit(1);
+    process.exit();
 }
 if (cliArgs["cid"] === undefined || cliArgs["secret"] === undefined) {
     throw new Error(chalk.red("The Spotify client ID and secret are required to run this script. Get them from https://developer.spotify.com/dashboard/applications and run the script again like this:\nnpx spotify-playlist-scraper cid=Client_ID secret=Client_Secret playlist=Playlist_ID"));
@@ -82,7 +83,7 @@ if (fs.existsSync(resolve(".") + "/tracks.json")) {
         }
         else {
             await DownloadYtDlp();
-            await DownloadMusic();
+            DownloadMusic();
             process.exit();
         }
     }
@@ -148,6 +149,8 @@ async function DownloadYtDlp() {
         LogInfo("yt-dlp already exists! Skipping download..");
     }
 }
+process.on("exit", () => {
+});
 async function ScrapeMusic() {
     LogInfo("Scraping tracks..");
     const tokenReq = await fetch("https://accounts.spotify.com/api/token", {

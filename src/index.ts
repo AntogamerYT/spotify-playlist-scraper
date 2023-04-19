@@ -1,4 +1,5 @@
-import { execSync, spawn, spawnSync } from "child_process";
+#! /usr/bin/env node
+import { execSync, spawnSync } from "child_process";
 import chalk from "chalk";
 import yesno from "yesno";
 import { argv } from "process";
@@ -36,9 +37,11 @@ argv.slice(2).map(arg => {
     const [key, value] = arg.split("=");
     cliArgs[key] = value;
 });
+
+
 if (Object.keys(cliArgs).length === 0) {
     LogInfo("Usage: npx spotify-playlist-scraper cid=Client_ID secret=Client_Secret playlist=Playlist_ID")
-    process.exit(1);
+    process.exit()
 }
 
 
@@ -92,7 +95,7 @@ if (fs.existsSync(resolve(".") + "/tracks.json")) {
             process.exit(0);
         } else {
             await DownloadYtDlp()
-            await DownloadMusic()
+            DownloadMusic()
             process.exit()
         }
     }
@@ -184,6 +187,9 @@ async function DownloadYtDlp() {
         LogInfo("yt-dlp already exists! Skipping download..")
     }
 }
+process.on("exit", () => {
+    
+})
 
 async function ScrapeMusic() {
     LogInfo("Scraping tracks..")
@@ -218,3 +224,5 @@ async function ScrapeMusic() {
     fs.writeFileSync(resolve(".") + "/tracks.json", JSON.stringify({ tracks: tracksJson }));
     LogInfo(`Scraped ${playlist.items.length} tracks!`)
 }
+
+
