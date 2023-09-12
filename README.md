@@ -2,7 +2,7 @@
 
 spotify-playlist-scraper is the first playlist data scraper that uses official APIs to scrape playlist (not for music tho, we use [yt-dlp](https://github.com/yt-dlp/yt-dlp/)) data and put them in a easily-readable [JSON file](https://github.com/AntogamerYT/spotify-playlist-scraper/blob/main/tracks.example.json)!
 
-Looking for support? [Join my Discord server!](https://discord.gg/ekaCwEfUt4)
+Looking for support? [Join my Discord server!](https://discord.gg/NKdSrmky6b)
 
 ## Notices
 This package is currently not usable in your code.
